@@ -3,6 +3,7 @@ try:
 except NameError:
     string_type = str
 
+
 class InvalidStateTransition(Exception):
     pass
 
@@ -11,14 +12,13 @@ class State(object):
     def __init__(self, initial=False, **kwargs):
         self.initial = initial
 
-    def __eq__(self,other):
+    def __eq__(self, other):
         if isinstance(other, string_type):
             return self.name == other
         elif isinstance(other, State):
             return self.name == other.name
         else:
             return False
-
 
     def __ne__(self, other):
         return not self == other

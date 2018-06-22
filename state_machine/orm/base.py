@@ -11,9 +11,22 @@ class BaseAdaptor(object):
     def get_potential_state_machine_attributes(self, clazz):
         return inspect.getmembers(clazz)
 
+    def get_all_event(self, original_class):
+        events = list()
+
+        for name, val in self.get_potential_state_machine_attributes(original_class):
+            if isinstance(val, Event):
+                events.append((name, val))
+
+        return events
+
     def process_states(self, original_class):
         initial_state = None
         is_method_dict = dict()
+        can_method_dict = dict()
+
+        original_class_events = self.get_all_event(original_class)
+
         for member, value in self.get_potential_state_machine_attributes(original_class):
 
             if isinstance(value, State):
@@ -22,9 +35,10 @@ class BaseAdaptor(object):
                         raise ValueError("multiple initial states!")
                     initial_state = value
 
-                #add its name to itself:
+                # add its name to itself:
                 setattr(value, 'name', member)
 
+                # add is_STATE method
                 is_method_string = "is_" + member
 
                 def is_method_builder(member):
@@ -34,6 +48,20 @@ class BaseAdaptor(object):
                     return property(f)
 
                 is_method_dict[is_method_string] = is_method_builder(member)
+
+                # add can_EVENT method
+                def can_method_builder(evt_class_from_states):
+                    def f(self):
+                        return self.aasm_state == evt_class_from_states or self.aasm_state in evt_class_from_states
+                    return property(f)
+
+                for evt_name, evt_class in original_class_events:
+                    can_method_string = "can_" + evt_name
+
+                    can_method_dict[can_method_string] = can_method_builder(evt_class.from_states)
+
+        # combine is_method with can_method
+        is_method_dict.update(can_method_dict)
 
         return is_method_dict, initial_state
 
@@ -46,7 +74,7 @@ class BaseAdaptor(object):
 
                 def event_meta_method(event_name, event_description):
                     def f(self):
-                        #assert current state
+                        # assert current state
                         if self.current_state not in event_description.from_states:
                             raise InvalidStateTransition
 
@@ -61,11 +89,11 @@ class BaseAdaptor(object):
                                     failed = True
                                     break
 
-                        #change state
+                        # change state
                         if not failed:
                             _adaptor.update(self, event_description.to_state.name)
 
-                            #fire after_change
+                            # fire after_change
                             if self.__class__.callback_cache and \
                                     event_name in self.__class__.callback_cache[_adaptor.original_class.__name__]['after']:
                                 for callback in self.__class__.callback_cache[_adaptor.original_class.__name__]['after'][event_name]:
@@ -81,7 +109,7 @@ class BaseAdaptor(object):
         class_name = original_class.__name__
         class_dict = dict()
 
-        class_dict['callback_cache'] = callback_cache
+        class_dict['callback_cache'] = callback_cache   # None
 
         def current_state_method():
             def f(self):
