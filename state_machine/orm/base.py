@@ -109,6 +109,25 @@ class BaseAdaptor(object):
         class_name = original_class.__name__
         class_dict = dict()
 
+        # add cans & cannots property for what can or cann't do
+        cans_method = "cans"
+        cannots_method = "cannots"
+
+        def can_property_method():
+            def f(self):
+                return [can for can in dir(self) if can.startswith("can_") if getattr(self, can)]
+
+            return property(f)
+
+        def cannot_property_method():
+            def f(self):
+                return [can for can in dir(self) if can.startswith("can_") if not getattr(self, can)]
+
+            return property(f)
+
+        class_dict[cans_method] = can_property_method()
+        class_dict[cannots_method] = cannot_property_method()
+
         class_dict['callback_cache'] = callback_cache   # None
 
         def current_state_method():
